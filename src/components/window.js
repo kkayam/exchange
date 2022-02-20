@@ -72,7 +72,7 @@ export const Default = () => (
       <WindowHeader className='window-header'>
         <span>exchange.exe</span>
         <Button>
-          <span className='close-icon' />
+        X
         </Button>
       </WindowHeader>
       <Toolbar>
