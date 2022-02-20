@@ -1,5 +1,6 @@
-import React from 'react';
-import styled from 'styled-components';
+import React, { useState, useEffect } from "react";
+
+import styled from "styled-components";
 import {
   Window,
   WindowContent,
@@ -8,8 +9,33 @@ import {
   Toolbar,
   Avatar,
   Fieldset,
-  TextField
-} from 'react95';
+  TextField,
+} from "react95";
+
+//   if (window.ethereum) { //check if Metamask is installed
+//         try {
+//             const address = await window.ethereum.enable(); //connect Metamask
+//             const obj = {
+//                     connectedStatus: true,
+//                     status: "",
+//                     address: address
+//                 }
+//                 return obj;
+
+//         } catch (error) {
+//             return {
+//                 connectedStatus: false,
+//                 status: "🦊 Connect to Metamask using the button on the top right."
+//             }
+//         }
+
+//   } else {
+//         return {
+//             connectedStatus: false,
+//             status: "🦊 You must install Metamask into your browser: https://metamask.io/download.html"
+//         }
+//       }
+// };
 
 const Wrapper = styled.div`
   padding: 5rem;
@@ -29,7 +55,7 @@ const Wrapper = styled.div`
     position: relative;
     &:before,
     &:after {
-      content: '';
+      content: "";
       position: absolute;
       background: ___CSS_1___;
     }
@@ -66,46 +92,136 @@ const Wrapper = styled.div`
     font-size: 3rem;
   }
 `;
-export const Default = () => (
-  <Wrapper>
-    <Window className='window'>
-      <WindowHeader className='window-header'>
-        <span>exchange.exe</span>
-        <Button>
-        X
-        </Button>
-      </WindowHeader>
-      <Toolbar>
-        <Button variant='menu' size='sm'>
-          Settings
-        </Button>
-        <Button variant='menu' size='sm'>
-          Wallet
-        </Button>
-      </Toolbar>
-      <WindowContent>
-      <Fieldset label="Byt">
-      <div>
-        <TextField fullWidth/>
-        
-        <Button style={{"position":"absolute","z-index":"500","margin-top": "-65px","right": "40px","font-size":"1.2rem","padding":"10px"}}> ETH </Button>
-        <Avatar size={50} style={{"z-index":"500","font-size":"2rem","position":"absolute","margin-left":"auto","margin-right":"auto","left":"0","right":"0","margin-top": "-10px" }}>
-          ▼
-        </Avatar>
-        </div>
-        <br/>
-        <div>
-        <TextField fullWidth/>
-        <Button style={{"position":"absolute","z-index":"500","margin-top": "-65px","right": "40px","font-size":"1.2rem","padding":"10px"}}> Välj token </Button>
-        </div>
-        <br/>
-        <Button style={{"height":"60px","font-size":"1.5rem"}} fullWidth> Anslut plånbok </Button>
-        </Fieldset>
-      </WindowContent>
-    </Window>
-  </Wrapper>
-);
+export function SwapWindow() {
+  const [status, setStatus] = useState({
+    connectedStatus: false,
+    status: "initialized",
+    address: "",
+  });
 
-Default.story = {
-  name: 'default'
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts",
+        });
+        setStatus({
+          connectedStatus: true,
+          status: "connected",
+          address: accounts,
+        });
+      } catch (error) {
+        if (error.code === 4001) {
+          setStatus({
+            connectedStatus: false,
+            status: "user denied",
+            address: "",
+          });
+        }
+      }
+    } else {
+      setStatus({
+        connectedStatus: false,
+        status: "metamask not installed",
+        address: "",
+      });
+    }
+  };
+
+  useEffect(() => {
+    connectWallet();
+  }, []);
+
+  return (
+    <Wrapper>
+      <Window className="window">
+        <WindowHeader className="window-header">
+          <span>exchange.exe</span>
+          <Button>X</Button>
+        </WindowHeader>
+        <Toolbar>
+          <Button variant="menu" size="sm">
+            Settings
+          </Button>
+          <Button variant="menu" size="sm">
+            Wallet
+          </Button>
+        </Toolbar>
+        <WindowContent>
+          <Fieldset label="Swap">
+            <div>
+              <TextField fullWidth />
+
+              <Button
+                style={{
+                  position: "absolute",
+                  "z-index": "500",
+                  "margin-top": "-65px",
+                  right: "40px",
+                  "font-size": "1.2rem",
+                  padding: "10px",
+                }}
+              >
+                {" "}
+                Avax{" "}
+              </Button>
+              <Avatar
+                size={50}
+                style={{
+                  "z-index": "500",
+                  "font-size": "2rem",
+                  position: "absolute",
+                  "margin-left": "auto",
+                  "margin-right": "auto",
+                  left: "0",
+                  right: "0",
+                  "margin-top": "-10px",
+                }}
+              >
+                ▼
+              </Avatar>
+            </div>
+            <br />
+            <div>
+              <TextField fullWidth />
+              <Button
+                style={{
+                  position: "absolute",
+                  "z-index": "500",
+                  "margin-top": "-65px",
+                  right: "40px",
+                  "font-size": "1.2rem",
+                  padding: "10px",
+                }}
+              >
+                Select token
+              </Button>
+            </div>
+            <br />
+            {!status.connectedStatus ? (
+              <Button
+                style={{ height: "60px", "font-size": "1.5rem" }}
+                onClick={connectWallet}
+                fullWidth
+              >
+                Connect wallet
+              </Button>
+            ) : (
+              <Button
+                style={{ height: "60px", "font-size": "1.5rem" }}
+                // onClick={connectWallet}
+                fullWidth
+              >
+                Swap
+              </Button>
+            )}
+          </Fieldset>
+        </WindowContent>
+      </Window>
+    </Wrapper>
+  );
+}
+
+SwapWindow.story = {
+  name: "default",
 };
