@@ -15,7 +15,7 @@ export function SwapField(props) {
     } else {
       setBuyAmount("0");
     }
-  }, [sellAmount, swapMode]);
+  }, [sellAmount, swapMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function decimalsToERC20(decimal_it) {
     return parseInt(decimal_it) / 10 ** props.ERC20_DECIMALS;
@@ -95,8 +95,19 @@ export function SwapField(props) {
       props.exchange.methods
         .getEthAmount(sellAmount)
         .call()
-        .then((buyAmount) => {
-          setBuyAmount(props.web3.utils.fromWei(buyAmount, "ether"));
+        .then((_buyAmount) => {
+          setBuyAmount(props.web3.utils.fromWei(_buyAmount, "ether"));
+          props.exchange.methods
+            .tokenToEthSwap(sellAmount, 0)
+            .estimateGas({ from: props.status.address })
+            .then((gasEstimate) => {
+              setCostInfo({
+                price:
+                  decimalsToERC20(sellAmount) /
+                  props.web3.utils.fromWei(_buyAmount, "ether"),
+                gas: gasEstimate,
+              });
+            });
         });
     }
   };

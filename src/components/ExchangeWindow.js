@@ -108,7 +108,7 @@ export function ExchangeWindow() {
   useEffect(() => {
     connectWallet();
     getExchange();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChangeTabs = (e, value) => setActiveTab(value);
 
