@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 
-import styled from "styled-components";
 import {
   Window,
   WindowContent,
@@ -20,63 +19,10 @@ import {
   ERC20_ABI,
 } from "../smart_contract/config";
 
+import { Wrapper } from "./windowWrapper";
+
 const validAvalancheChain = "0XA869";
 
-const Wrapper = styled.div`
-  padding: 5rem;
-  background: ___CSS_0___;
-  .window-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .close-icon {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    margin-left: -1px;
-    margin-top: -1px;
-    transform: rotateZ(45deg);
-    position: relative;
-    &:before,
-    &:after {
-      content: "";
-      position: absolute;
-      background: ___CSS_1___;
-    }
-    &:before {
-      height: 100%;
-      width: 3px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-    &:after {
-      height: 3px;
-      width: 100%;
-      left: 0px;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-  }
-  .window {
-    width: 600px;
-    min-height: 400px;
-  }
-  .window:nth-child(2) {
-    margin: 2rem;
-  }
-  .footer {
-    display: block;
-    margin: 0.25rem;
-    height: 31px;
-    line-height: 31px;
-    padding-left: 0.25rem;
-  }
-  input {
-    padding: 15px;
-    font-size: 3rem;
-  }
-`;
 export function SwapWindow() {
   const [status, setStatus] = useState({
     connected: false,
@@ -178,44 +124,50 @@ export function SwapWindow() {
   }
 
   async function swap() {
-    var s = status;
-    try {
-      if (!swapMode) {
-        s.status = "loading";
-        setStatus(s);
-        exchange.methods
-          .ethToTokenSwap(0)
-          .send({
-            from: status.address,
-            gas: 470000,
-            value: sellAmount, // in WEI, which is equivalent to 1 ether
-          })
-          .then(() => {
-            s = status;
-            s.status = "";
-            setStatus(s);
-          });
-      } else {
-        s.status = "loading";
-        setStatus(s);
-        ERC20.methods
-          .approve(CONTRACT_ADDRESS, sellAmount)
-          .send({ from: status.address })
-          .then(() => {
-            exchange.methods
-              .tokenToEthSwap(sellAmount, 0)
-              .send({ from: status.address })
-              .then(() => {
-                s = status;
-                s.status = "";
-                setStatus(s);
-              });
-          });
-      }
-    } catch (e) {
-      s = status;
-      s.status = "";
-      setStatus(s);
+    var s = { ...status };
+    s.status = "loading";
+    setStatus(s);
+    if (!swapMode) {
+      exchange.methods
+        .ethToTokenSwap(0)
+        .send({
+          from: status.address,
+          gas: 470000,
+          value: sellAmount, // in WEI, which is equivalent to 1 ether
+        })
+        .then(() => {
+          s = status;
+          s.status = "";
+          setStatus(s);
+          getBuyAmount();
+        })
+        .catch((e) => {
+          s = status;
+          s.status = "";
+          setStatus(s);
+          getBuyAmount();
+        });
+    } else {
+      ERC20.methods
+        .approve(CONTRACT_ADDRESS, sellAmount)
+        .send({ from: status.address })
+        .then(() => {
+          exchange.methods
+            .tokenToEthSwap(sellAmount, 0)
+            .send({ from: status.address })
+            .then(() => {
+              s = { ...status };
+              s.status = "";
+              setStatus(s);
+              getBuyAmount();
+            })
+            .catch((e) => {
+              s = { ...status };
+              s.status = "";
+              setStatus(s);
+              getBuyAmount();
+            });
+        });
     }
   }
 
@@ -326,8 +278,15 @@ export function SwapWindow() {
               </Button>
             ) : status.status === "loading" ? (
               <>
-                <p> Loading... </p>
-                <LoadingIndicator />
+                <Button
+                  style={{ height: "60px", "font-size": "1.5rem" }}
+                  onClick={swap}
+                  fullWidth
+                  disabled
+                >
+                  {/* <LoadingIndicator /> */}
+                  Swap in progress...
+                </Button>
               </>
             ) : (
               <Button
