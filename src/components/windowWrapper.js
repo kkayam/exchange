@@ -39,6 +39,10 @@ export const Wrapper = styled.div`
   .window {
     width: 600px;
     min-height: 400px;
+    position: absolute;
+    left: 50%;
+    top: 7%;
+    transform: translate(-50%, 0);
   }
   .window:nth-child(2) {
     margin: 2rem;

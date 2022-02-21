@@ -40,16 +40,7 @@ const App = () => (
   <div>
     <GlobalStyles />
     <ThemeProvider theme={cherry}>
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: "30%",
-          transform: "translate(-50%, -50%)",
-        }}
-      >
-        <ExchangeWindow />
-      </div>
+      <ExchangeWindow />
     </ThemeProvider>
   </div>
 );

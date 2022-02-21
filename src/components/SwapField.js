@@ -203,7 +203,7 @@ export function SwapField(props) {
         <>
           <br />
           <br />
-          <Fieldset label="info">
+          <Fieldset label="cost info">
             <p>Price: {costInfo.price}</p>
             <p>Gas estimate: {costInfo.gas}</p>
           </Fieldset>
