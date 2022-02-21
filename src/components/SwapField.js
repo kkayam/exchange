@@ -8,6 +8,7 @@ export function SwapField(props) {
   const [buyAmount, setBuyAmount] = useState(0);
   const [swapMode, setSwapMode] = useState(0);
   const [costInfo, setCostInfo] = useState();
+  const [reserves, setReserves] = useState(["", ""]);
 
   useEffect(() => {
     if (sellAmount > 0) {
@@ -15,13 +16,48 @@ export function SwapField(props) {
     } else {
       setBuyAmount("0");
     }
-  }, [sellAmount, swapMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sellAmount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (sellAmount > 0) {
+      if (!swapMode) {
+        setSellAmount(
+          props.web3.utils.toWei(
+            decimalsToERC20(sellAmount).toString(),
+            "ether"
+          )
+        );
+      } else {
+        setSellAmount(
+          ERC20ToDecimals(props.web3.utils.fromWei(sellAmount, "ether"))
+        );
+      }
+    } else {
+      setBuyAmount("0");
+    }
+  }, [swapMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    getReserves();
+  }, [props.ERC20_DECIMALS]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function decimalsToERC20(decimal_it) {
     return parseInt(decimal_it) / 10 ** props.ERC20_DECIMALS;
   }
   function ERC20ToDecimals(n) {
     return parseInt(n) * 10 ** props.ERC20_DECIMALS;
+  }
+
+  async function getReserves() {
+    Promise.allSettled([
+      props.web3.eth.getBalance(props.CONTRACT_ADDRESS),
+      props.exchange.methods.getReserve().call(),
+    ]).then((result) => {
+      setReserves([
+        props.web3.utils.fromWei(result[0].value, "ether"),
+        decimalsToERC20(result[1].value),
+      ]);
+    });
   }
 
   async function swap() {
@@ -41,12 +77,14 @@ export function SwapField(props) {
           s.status = "";
           props.setStatus(s);
           getBuyAmount();
+          getReserves();
         })
         .catch((e) => {
           s = { ...props.status };
           s.status = "";
           props.setStatus(s);
           getBuyAmount();
+          getReserves();
         });
     } else {
       props.ERC20.methods
@@ -61,12 +99,14 @@ export function SwapField(props) {
               s.status = "";
               props.setStatus(s);
               getBuyAmount();
+              getReserves();
             })
             .catch((e) => {
               s = { ...props.status };
               s.status = "";
               props.setStatus(s);
               getBuyAmount();
+              getReserves();
             });
         });
     }
@@ -79,17 +119,11 @@ export function SwapField(props) {
         .call()
         .then((_buyAmount) => {
           setBuyAmount(decimalsToERC20(_buyAmount));
-          props.exchange.methods
-            .ethToTokenSwap(0)
-            .estimateGas({ from: props.status.address })
-            .then((gasEstimate) => {
-              setCostInfo({
-                price:
-                  props.web3.utils.fromWei(sellAmount, "ether") /
-                  decimalsToERC20(_buyAmount),
-                gas: gasEstimate,
-              });
-            });
+          setCostInfo({
+            price:
+              props.web3.utils.fromWei(sellAmount, "ether") /
+              decimalsToERC20(_buyAmount),
+          });
         });
     } else {
       props.exchange.methods
@@ -97,17 +131,11 @@ export function SwapField(props) {
         .call()
         .then((_buyAmount) => {
           setBuyAmount(props.web3.utils.fromWei(_buyAmount, "ether"));
-          props.exchange.methods
-            .tokenToEthSwap(sellAmount, 0)
-            .estimateGas({ from: props.status.address })
-            .then((gasEstimate) => {
-              setCostInfo({
-                price:
-                  decimalsToERC20(sellAmount) /
-                  props.web3.utils.fromWei(_buyAmount, "ether"),
-                gas: gasEstimate,
-              });
-            });
+          setCostInfo({
+            price:
+              decimalsToERC20(sellAmount) /
+              props.web3.utils.fromWei(_buyAmount, "ether"),
+          });
         });
     }
   };
@@ -126,14 +154,13 @@ export function SwapField(props) {
   };
 
   const toggleSwapMode = (e) => {
-    setSwapMode(1 - swapMode);
+    setSwapMode(1 - swapMode).then(() => {});
   };
 
   return (
     <>
       <div>
-        <TextField fullWidth defaultValue={0} onChange={inputChange} />
-
+        <TextField fullWidth placeholder="0" onChange={inputChange} />
         <Button
           style={{
             position: "absolute",
@@ -143,6 +170,7 @@ export function SwapField(props) {
             "font-size": "1.2rem",
             padding: "10px",
           }}
+          onClick={toggleSwapMode}
         >
           {props.tokens[swapMode]}
         </Button>
@@ -176,6 +204,7 @@ export function SwapField(props) {
             "font-size": "1.2rem",
             padding: "10px",
           }}
+          onClick={toggleSwapMode}
         >
           {props.tokens[1 - swapMode]}
         </Button>
@@ -210,13 +239,25 @@ export function SwapField(props) {
           Swap
         </Button>
       )}
-      {props.status.connected && costInfo ? (
+      {props.status.connected ? (
         <>
           <br />
           <br />
-          <Fieldset label="cost info">
-            <p>Price: {costInfo.price}</p>
-            <p>Gas estimate: {costInfo.gas}</p>
+          <Fieldset label="ℹ">
+            <p>Reserves</p>
+            <p style={{ "margin-left": "20px" }}>
+              {props.tokens[0]}: {reserves[0]}
+            </p>
+            <p style={{ "margin-left": "20px" }}>
+              {props.tokens[1]}: {reserves[1]}
+            </p>
+            {costInfo ? (
+              <>
+                <p>Price: {costInfo.price}</p>
+              </>
+            ) : (
+              <></>
+            )}
           </Fieldset>
         </>
       ) : (
