@@ -10,32 +10,17 @@ import {
   Avatar,
   Fieldset,
   TextField,
+  LoadingIndicator,
 } from "react95";
 
-//   if (window.ethereum) { //check if Metamask is installed
-//         try {
-//             const address = await window.ethereum.enable(); //connect Metamask
-//             const obj = {
-//                     connectedStatus: true,
-//                     status: "",
-//                     address: address
-//                 }
-//                 return obj;
+import Web3 from "web3";
+import {
+  CONTRACT_ABI,
+  CONTRACT_ADDRESS,
+  ERC20_ABI,
+} from "../smart_contract/config";
 
-//         } catch (error) {
-//             return {
-//                 connectedStatus: false,
-//                 status: "🦊 Connect to Metamask using the button on the top right."
-//             }
-//         }
-
-//   } else {
-//         return {
-//             connectedStatus: false,
-//             status: "🦊 You must install Metamask into your browser: https://metamask.io/download.html"
-//         }
-//       }
-// };
+const validAvalancheChain = "0XA869";
 
 const Wrapper = styled.div`
   padding: 5rem;
@@ -94,43 +79,166 @@ const Wrapper = styled.div`
 `;
 export function SwapWindow() {
   const [status, setStatus] = useState({
-    connectedStatus: false,
-    status: "initialized",
+    connected: false,
+    status: "Connect wallet",
     address: "",
   });
 
+  const [exchange, setExchange] = useState();
+  const [sellAmount, setSellAmount] = useState(0);
+  const [buyAmount, setBuyAmount] = useState(0);
+  const [swapMode, setSwapMode] = useState(0);
+  const [ERC20, setERC20] = useState(0);
+  const [tokens, setTokens] = useState(["AVAX", ""]);
+  const [ERC20_DECIMALS, setERC20_DECIMALS] = useState(0);
+
+  const web3 = new Web3(window.ethereum);
+
   const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({
-          method: "eth_requestAccounts",
-        });
-        setStatus({
-          connectedStatus: true,
-          status: "connected",
-          address: accounts,
-        });
-      } catch (error) {
-        if (error.code === 4001) {
-          setStatus({
-            connectedStatus: false,
-            status: "user denied",
-            address: "",
-          });
-        }
-      }
-    } else {
+    try {
+      const accounts = await web3.eth.requestAccounts().then(fa);
       setStatus({
-        connectedStatus: false,
-        status: "metamask not installed",
+        connected: true,
+        status: "",
+        address: accounts[0],
+      });
+    } catch (error) {
+      setStatus({
+        connected: false,
+        status: "Connect wallet",
         address: "",
       });
     }
+    try {
+      if (!(validAvalancheChain === window.ethereum.chainId.toUpperCase())) {
+        var s = status;
+        s.connected = false;
+        s.status = "Switch to Avax Testnet";
+        setStatus(s);
+        const response = await web3.currentProvider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: validAvalancheChain }],
+        });
+        if (!response.code) {
+          s.connected = true;
+          s.status = "";
+          setStatus(s);
+        }
+      }
+    } catch (error) {}
+
+    window.ethereum.on("chainChanged", () => {
+      window.location.reload();
+    });
+    const exchange = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+    setExchange(exchange);
+    exchange.methods
+      .tokenAddress()
+      .call()
+      .then((ERC20_ADDRESS) => {
+        const ERC20 = new web3.eth.Contract(ERC20_ABI, ERC20_ADDRESS);
+        setERC20(ERC20);
+        ERC20.methods
+          .name()
+          .call()
+          .then((ERC20_name) => {
+            setTokens(["AVAX", ERC20_name]);
+          });
+        ERC20.methods
+          .decimals()
+          .call()
+          .then((ERC20_decimals) => {
+            setERC20_DECIMALS(ERC20_decimals);
+          });
+      });
   };
 
   useEffect(() => {
     connectWallet();
   }, []);
+
+  useEffect(() => {
+    getBuyAmount();
+  }, [sellAmount, swapMode]);
+
+  function decimalsToERC20(decimal_it) {
+    return parseInt(decimal_it) / 10 ** ERC20_DECIMALS;
+  }
+  function ERC20ToDecimals(n) {
+    return parseInt(n) * 10 ** ERC20_DECIMALS;
+  }
+
+  async function swap() {
+    var s = status;
+    try {
+      if (!swapMode) {
+        s.status = "loading";
+        setStatus(s);
+        exchange.methods
+          .ethToTokenSwap(0)
+          .send({
+            from: status.address,
+            gas: 470000,
+            value: sellAmount, // in WEI, which is equivalent to 1 ether
+          })
+          .then(() => {
+            s = status;
+            s.status = "";
+            setStatus(s);
+          });
+      } else {
+        s.status = "loading";
+        setStatus(s);
+        ERC20.methods
+          .approve(CONTRACT_ADDRESS, sellAmount)
+          .send({ from: status.address })
+          .then(() => {
+            exchange.methods
+              .tokenToEthSwap(sellAmount, 0)
+              .send({ from: status.address })
+              .then(() => {
+                s = status;
+                s.status = "";
+                setStatus(s);
+              });
+          });
+      }
+    } catch (e) {
+      s = status;
+      s.status = "";
+      setStatus(s);
+    }
+  }
+
+  const getBuyAmount = async () => {
+    if (!swapMode) {
+      exchange.methods
+        .getTokenAmount(sellAmount)
+        .call()
+        .then((buyAmount) => {
+          setBuyAmount(decimalsToERC20(buyAmount));
+        });
+    } else {
+      exchange.methods
+        .getEthAmount(sellAmount)
+        .call()
+        .then((buyAmount) => {
+          setBuyAmount(web3.utils.fromWei(buyAmount, "ether"));
+        });
+    }
+  };
+
+  const inputChange = (e) => {
+    if (!swapMode) {
+      setSellAmount(Web3.utils.toWei(e.target.value, "ether"));
+    } else {
+      setSellAmount(ERC20ToDecimals(e.target.value));
+    }
+  };
+
+  const toggleSwapMode = (e) => {
+    setSwapMode(1 - swapMode);
+  };
 
   return (
     <Wrapper>
@@ -150,7 +258,7 @@ export function SwapWindow() {
         <WindowContent>
           <Fieldset label="Swap">
             <div>
-              <TextField fullWidth />
+              <TextField fullWidth defaultValue={0} onChange={inputChange} />
 
               <Button
                 style={{
@@ -162,8 +270,7 @@ export function SwapWindow() {
                   padding: "10px",
                 }}
               >
-                {" "}
-                Avax{" "}
+                {tokens[swapMode]}
               </Button>
               <Avatar
                 size={50}
@@ -176,14 +283,16 @@ export function SwapWindow() {
                   left: "0",
                   right: "0",
                   "margin-top": "-10px",
+                  cursor: "pointer",
                 }}
+                onClick={toggleSwapMode}
               >
                 ▼
               </Avatar>
             </div>
             <br />
             <div>
-              <TextField fullWidth />
+              <TextField value={buyAmount} disabled fullWidth />
               <Button
                 style={{
                   position: "absolute",
@@ -194,22 +303,27 @@ export function SwapWindow() {
                   padding: "10px",
                 }}
               >
-                Select token
+                {tokens[1 - swapMode]}
               </Button>
             </div>
             <br />
-            {!status.connectedStatus ? (
+            {!status.connected ? (
               <Button
                 style={{ height: "60px", "font-size": "1.5rem" }}
                 onClick={connectWallet}
                 fullWidth
               >
-                Connect wallet
+                {status.status}
               </Button>
+            ) : status.status === "loading" ? (
+              <>
+                <p> Loading... </p>
+                <LoadingIndicator />
+              </>
             ) : (
               <Button
                 style={{ height: "60px", "font-size": "1.5rem" }}
-                // onClick={connectWallet}
+                onClick={swap}
                 fullWidth
               >
                 Swap
