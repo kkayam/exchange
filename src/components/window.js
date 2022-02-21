@@ -95,41 +95,49 @@ export function SwapWindow() {
   const web3 = new Web3(window.ethereum);
 
   const connectWallet = async () => {
-    try {
-      const accounts = await web3.eth.requestAccounts().then(fa);
-      setStatus({
-        connected: true,
-        status: "",
-        address: accounts[0],
-      });
-    } catch (error) {
-      setStatus({
-        connected: false,
-        status: "Connect wallet",
-        address: "",
-      });
-    }
-    try {
-      if (!(validAvalancheChain === window.ethereum.chainId.toUpperCase())) {
-        var s = status;
-        s.connected = false;
-        s.status = "Switch to Avax Testnet";
-        setStatus(s);
-        const response = await web3.currentProvider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: validAvalancheChain }],
+    web3.eth
+      .requestAccounts()
+      .then((accounts) => {
+        setStatus({
+          connected: true,
+          status: "",
+          address: accounts[0],
         });
-        if (!response.code) {
-          s.connected = true;
-          s.status = "";
+      })
+      .catch((e) => {
+        setStatus({
+          connected: false,
+          status: "Connect wallet",
+          address: "",
+        });
+      })
+      .then(() => {
+        if (!(validAvalancheChain === window.ethereum.chainId.toUpperCase())) {
+          var s = status;
+          s.connected = false;
+          s.status = "Switch to Avax Testnet";
           setStatus(s);
+          web3.currentProvider
+            .request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: validAvalancheChain }],
+            })
+            .then((response) => {
+              if (!response.code) {
+                s.connected = true;
+                s.status = "";
+                setStatus(s);
+              }
+            });
         }
-      }
-    } catch (error) {}
+      });
 
     window.ethereum.on("chainChanged", () => {
       window.location.reload();
     });
+  };
+
+  const getExchange = async () => {
     const exchange = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
     setExchange(exchange);
     exchange.methods
@@ -155,6 +163,7 @@ export function SwapWindow() {
 
   useEffect(() => {
     connectWallet();
+    getExchange();
   }, []);
 
   useEffect(() => {
